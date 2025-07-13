@@ -40,6 +40,7 @@ export const MFAVerification = ({ resolver, onSuccess, onCancel }: MFAVerificati
         "recaptcha-container-mfa",
         {
           size: "invisible",
+          sitekey: "6Lc4a4ErAAAAAK4PND-F5EXUg2eBcgGHt59s5s1Y",
           callback: () => {
             // reCAPTCHA solved
           },
