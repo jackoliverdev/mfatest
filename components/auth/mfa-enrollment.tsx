@@ -221,15 +221,18 @@ export const MFAEnrollment = () => {
   };
 
   const sendVerificationCode = async () => {
+    alert("🔥 FUNCTION CALLED - CHECK CONSOLE NOW");
     console.log("🔥 SEND VERIFICATION CODE FUNCTION CALLED");
     
     if (!user) {
+      alert("❌ NO USER FOUND");
       console.log("❌ NO USER FOUND");
       logDebug("No user found");
       return;
     }
 
     if (!user.emailVerified) {
+      alert("❌ EMAIL NOT VERIFIED");
       console.log("❌ EMAIL NOT VERIFIED");
       logDebug("Email not verified");
       toast({
@@ -241,6 +244,7 @@ export const MFAEnrollment = () => {
     }
 
     if (!verifier) {
+      alert("❌ NO RECAPTCHA VERIFIER");
       console.log("❌ NO RECAPTCHA VERIFIER");
       logDebug("reCAPTCHA verifier not initialized");
       toast({
@@ -251,6 +255,7 @@ export const MFAEnrollment = () => {
     }
     
     try {
+      alert("🚀 STARTING SMS PROCESS");
       console.log("🚀 STARTING SMS VERIFICATION PROCESS");
       logDebug("Starting SMS verification process", {
         phoneNumber,
