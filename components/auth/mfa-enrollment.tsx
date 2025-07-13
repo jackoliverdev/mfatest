@@ -24,6 +24,8 @@ import {
 import { useAuth, useUser } from "reactfire";
 
 export const MFAEnrollment = () => {
+  console.log("🚀 MFA ENROLLMENT COMPONENT LOADED");
+  
   const auth = useAuth();
   const { data: user } = useUser();
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -218,12 +220,16 @@ export const MFAEnrollment = () => {
   };
 
   const sendVerificationCode = async () => {
+    console.log("🔥 SEND VERIFICATION CODE FUNCTION CALLED");
+    
     if (!user) {
+      console.log("❌ NO USER FOUND");
       logDebug("No user found");
       return;
     }
 
     if (!user.emailVerified) {
+      console.log("❌ EMAIL NOT VERIFIED");
       logDebug("Email not verified");
       toast({
         title: "Email Not Verified",
@@ -234,6 +240,7 @@ export const MFAEnrollment = () => {
     }
 
     if (!verifier) {
+      console.log("❌ NO RECAPTCHA VERIFIER");
       logDebug("reCAPTCHA verifier not initialized");
       toast({
         title: "Error",
@@ -243,6 +250,7 @@ export const MFAEnrollment = () => {
     }
     
     try {
+      console.log("🚀 STARTING SMS VERIFICATION PROCESS");
       logDebug("Starting SMS verification process", {
         phoneNumber,
         userEmail: user.email,
@@ -288,6 +296,11 @@ export const MFAEnrollment = () => {
       });
       
     } catch (error: any) {
+      console.log("💥 SMS VERIFICATION FAILED - BASIC ERROR LOG:");
+      console.log(error);
+      console.log("Error message:", error.message);
+      console.log("Error code:", error.code);
+      
       logDebug("SMS verification failed", { 
         error: error.message, 
         code: error.code,
