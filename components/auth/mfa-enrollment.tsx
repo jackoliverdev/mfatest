@@ -35,9 +35,37 @@ export const MFAEnrollment = () => {
   const [emailVerified, setEmailVerified] = useState(false);
   const [verifier, setVerifier] = useState<RecaptchaVerifier | null>(null);
 
+  // Enhanced logging function
+  const logDebug = (message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      message,
+      data: data || {},
+      user: user?.email || 'not-logged-in',
+      step,
+      phoneNumber: phoneNumber || 'not-set'
+    };
+    
+    console.log(`🔍 MFA Debug [${timestamp}]:`, message, data);
+    
+    // Also log to a global array for easier debugging
+    if (typeof window !== 'undefined') {
+      if (!(window as any).mfaDebugLogs) {
+        (window as any).mfaDebugLogs = [];
+      }
+      (window as any).mfaDebugLogs.push(logEntry);
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      console.log("👤 User email verified:", user.emailVerified);
+      logDebug("User loaded", { 
+        email: user.email, 
+        emailVerified: user.emailVerified,
+        uid: user.uid
+      });
+      
       setEmailVerified(user.emailVerified);
       if (user.emailVerified) {
         setStep("phone");
@@ -52,16 +80,17 @@ export const MFAEnrollment = () => {
       return;
     }
 
-    console.log("🔧 Initializing reCAPTCHA in useEffect...");
+    logDebug("Initializing reCAPTCHA verifier");
+    
     const recaptchaVerifier = new RecaptchaVerifier(
       "recaptcha-container",
       {
         size: "normal",
-        callback: () => {
-          console.log("✅ reCAPTCHA solved!");
+        callback: (response: any) => {
+          logDebug("reCAPTCHA solved", { response });
         },
         "expired-callback": () => {
-          console.log("⚠️ reCAPTCHA expired, recreating...");
+          logDebug("reCAPTCHA expired, recreating...");
           setVerifier(null);
         },
       },
@@ -69,10 +98,15 @@ export const MFAEnrollment = () => {
     );
 
     setVerifier(recaptchaVerifier);
-    recaptchaVerifier.render();
+    
+    recaptchaVerifier.render().then(() => {
+      logDebug("reCAPTCHA rendered successfully");
+    }).catch((error) => {
+      logDebug("reCAPTCHA render failed", { error: error.message, code: error.code });
+    });
 
     return () => {
-      console.log("🧹 Clearing reCAPTCHA on unmount or step change");
+      logDebug("Cleaning up reCAPTCHA");
       recaptchaVerifier.clear();
     };
   }, [step, auth]);
@@ -81,19 +115,24 @@ export const MFAEnrollment = () => {
     if (!user) return;
 
     try {
-      console.log("📧 Sending email verification...");
+      logDebug("Starting email verification");
       setIsLoading(true);
       
       await sendEmailVerification(user);
       
+      logDebug("Email verification sent successfully");
       toast({
         title: "Verification Email Sent!",
         description: "Please check your email and click the verification link.",
       });
       
-      console.log("✅ Email verification sent");
     } catch (error: any) {
-      console.error("❌ Error sending email verification:", error);
+      logDebug("Email verification failed", { 
+        error: error.message, 
+        code: error.code,
+        stack: error.stack 
+      });
+      
       toast({
         title: "Error",
         description: `Failed to send verification email: ${error.message}`,
@@ -107,13 +146,14 @@ export const MFAEnrollment = () => {
     if (!user) return;
 
     try {
-      console.log("🔄 Checking email verification status...");
+      logDebug("Checking email verification status");
       setIsLoading(true);
       
-      // Reload user to get latest verification status
       await user.reload();
       
-      console.log("📧 Email verified:", user.emailVerified);
+      logDebug("Email verification status checked", { 
+        emailVerified: user.emailVerified 
+      });
       
       if (user.emailVerified) {
         setEmailVerified(true);
@@ -129,7 +169,11 @@ export const MFAEnrollment = () => {
         });
       }
     } catch (error: any) {
-      console.error("❌ Error checking email verification:", error);
+      logDebug("Email verification check failed", { 
+        error: error.message, 
+        code: error.code 
+      });
+      
       toast({
         title: "Error",
         description: "Failed to check verification status.",
@@ -143,13 +187,13 @@ export const MFAEnrollment = () => {
     if (!user || !user.email) return;
 
     try {
-      console.log("🔐 Starting re-authentication for user:", user.email);
+      logDebug("Starting re-authentication", { email: user.email });
       setIsLoading(true);
       
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
       
-      console.log("✅ Re-authentication successful");
+      logDebug("Re-authentication successful");
       toast({
         title: "Re-authentication Successful",
         description: "You can now proceed with MFA setup.",
@@ -158,7 +202,12 @@ export const MFAEnrollment = () => {
       setStep("phone");
       setPassword("");
     } catch (error: any) {
-      console.error("❌ Re-authentication failed:", error);
+      logDebug("Re-authentication failed", { 
+        error: error.message, 
+        code: error.code,
+        email: user.email 
+      });
+      
       toast({
         title: "Re-authentication Failed",
         description: error.message || "Please check your password and try again.",
@@ -170,12 +219,12 @@ export const MFAEnrollment = () => {
 
   const sendVerificationCode = async () => {
     if (!user) {
-      console.error("❌ No user found");
+      logDebug("No user found");
       return;
     }
 
     if (!user.emailVerified) {
-      console.error("❌ Email not verified");
+      logDebug("Email not verified");
       toast({
         title: "Email Not Verified",
         description: "Please verify your email first.",
@@ -185,7 +234,7 @@ export const MFAEnrollment = () => {
     }
 
     if (!verifier) {
-      console.error("❌ reCAPTCHA verifier not initialized");
+      logDebug("reCAPTCHA verifier not initialized");
       toast({
         title: "Error",
         description: "reCAPTCHA is not ready. Please wait a moment and try again.",
@@ -194,53 +243,74 @@ export const MFAEnrollment = () => {
     }
     
     try {
-      console.log("📱 Starting SMS verification process...");
-      console.log("👤 User:", user.email);
-      console.log("📞 Phone number:", phoneNumber);
+      logDebug("Starting SMS verification process", {
+        phoneNumber,
+        userEmail: user.email,
+        userUid: user.uid,
+        emailVerified: user.emailVerified
+      });
       
       setIsLoading(true);
       
-      console.log("🔄 Getting multi-factor session...");
+      logDebug("Getting multi-factor session");
       const multiFactorSession = await multiFactor(user).getSession();
-      console.log("✅ Multi-factor session obtained:", multiFactorSession);
+      
+      logDebug("Multi-factor session obtained", {
+        sessionId: multiFactorSession ? 'present' : 'null'
+      });
       
       const phoneInfoOptions = {
         phoneNumber: phoneNumber,
         session: multiFactorSession,
       };
-      console.log("📋 Phone info options:", phoneInfoOptions);
+      
+      logDebug("Phone info options prepared", phoneInfoOptions);
 
-      console.log("🔄 Creating PhoneAuthProvider...");
       const phoneAuthProvider = new PhoneAuthProvider(auth);
       
-      console.log("🔄 Verifying phone number...");
+      logDebug("Starting phone number verification", {
+        phoneNumber,
+        verifierType: verifier.constructor.name
+      });
+      
       const verificationId = await phoneAuthProvider.verifyPhoneNumber(
         phoneInfoOptions,
         verifier
       );
 
-      console.log("✅ Verification ID received:", verificationId);
+      logDebug("Phone verification successful", { verificationId });
+      
       setVerificationId(verificationId);
       setStep("code");
       toast({
         title: "SMS Sent!",
         description: "Please check your phone for the verification code.",
       });
+      
     } catch (error: any) {
-      console.error("❌ Error sending SMS:", error);
-      console.error("❌ Error code:", error.code);
-      console.error("❌ Error message:", error.message);
-      console.error("❌ Full error:", error);
+      logDebug("SMS verification failed", { 
+        error: error.message, 
+        code: error.code,
+        stack: error.stack,
+        phoneNumber,
+        userEmail: user.email,
+        // Additional debugging info
+        authDomain: auth.config?.authDomain,
+        apiKey: auth.config?.apiKey?.substring(0, 10) + '...'
+      });
+      
+      // Also log the full error object for debugging
+      console.error("Full error object:", error);
       
       if (error.code === "auth/requires-recent-login") {
-        console.log("🔐 User needs to re-authenticate");
+        logDebug("Recent login required, redirecting to reauth");
         toast({
           title: "Re-authentication Required",
           description: "Please enter your password to continue with MFA setup.",
         });
         setStep("reauth");
       } else if (error.code === "auth/unverified-email") {
-        console.log("📧 Email not verified");
+        logDebug("Email not verified, redirecting to email verification");
         toast({
           title: "Email Not Verified",
           description: "Please verify your email first.",
@@ -260,28 +330,31 @@ export const MFAEnrollment = () => {
 
   const verifyAndEnroll = async () => {
     if (!user || !verificationId) {
-      console.error("❌ Missing user or verification ID");
+      logDebug("Missing user or verification ID", { 
+        hasUser: !!user, 
+        hasVerificationId: !!verificationId 
+      });
       return;
     }
 
     try {
-      console.log("🔄 Starting MFA enrollment...");
-      console.log("📞 Verification ID:", verificationId);
-      console.log("🔢 Verification code:", verificationCode);
+      logDebug("Starting MFA enrollment", {
+        verificationId,
+        verificationCode,
+        userEmail: user.email
+      });
       
       setIsLoading(true);
       
-      console.log("🔄 Creating phone credential...");
       const cred = PhoneAuthProvider.credential(verificationId, verificationCode);
-      console.log("✅ Phone credential created");
+      logDebug("Phone credential created");
       
-      console.log("🔄 Creating multi-factor assertion...");
       const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
-      console.log("✅ Multi-factor assertion created");
+      logDebug("Multi-factor assertion created");
       
-      console.log("🔄 Enrolling MFA...");
       await multiFactor(user).enroll(multiFactorAssertion, "Personal Phone");
-      console.log("✅ MFA enrollment successful!");
+      
+      logDebug("MFA enrollment successful");
       
       toast({
         title: "MFA Enabled!",
@@ -293,16 +366,29 @@ export const MFAEnrollment = () => {
       setVerificationCode("");
       setVerificationId("");
       setStep("phone");
+      
     } catch (error: any) {
-      console.error("❌ Error enrolling MFA:", error);
-      console.error("❌ Error code:", error.code);
-      console.error("❌ Error message:", error.message);
+      logDebug("MFA enrollment failed", { 
+        error: error.message, 
+        code: error.code,
+        stack: error.stack,
+        verificationId,
+        verificationCode: verificationCode ? 'present' : 'missing'
+      });
+      
       toast({
         title: "Error",
         description: `Failed to enable MFA: ${error.message}`,
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Add a debug info display for development
+  const showDebugInfo = () => {
+    if (typeof window !== 'undefined' && (window as any).mfaDebugLogs) {
+      console.table((window as any).mfaDebugLogs);
     }
   };
 
@@ -313,6 +399,15 @@ export const MFAEnrollment = () => {
         <CardDescription>
           Add your phone number for extra security
         </CardDescription>
+        {/* Debug button - remove in production */}
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={showDebugInfo}
+          className="mt-2"
+        >
+          Show Debug Logs
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {step === "email-verify" ? (
