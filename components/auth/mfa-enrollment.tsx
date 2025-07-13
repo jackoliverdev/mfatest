@@ -88,6 +88,7 @@ export const MFAEnrollment = () => {
       "recaptcha-container",
       {
         size: "normal",
+        sitekey: "6Lc4a4ErAAAAAK4PND-F5EXUg2eBcgGHt59s5s1Y",
         callback: (response: any) => {
           logDebug("reCAPTCHA solved", { response });
         },
